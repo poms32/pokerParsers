@@ -95,6 +95,7 @@ def GetPreActions(hand, handInfo):
     """
     posting blinds
     players sitting out
+    
     """
     lines = hand.splitlines()
     i = len(handInfo['players']) + 2
@@ -102,9 +103,15 @@ def GetPreActions(hand, handInfo):
     for line in lines[i:]:
         if line == '*** HOLE CARDS ***':
             break
-        
-            
-        actions.append(line)
+        elif line.startswith('Seat '):
+            seat, ln = line[5:].split(":", 1)
+            ln = ln.strip()
+            player, ln = ln.split("(", 1)
+            player = player.strip()
+            chips, ln = ln.split(" ", 1)
+            actions.append({'seat':seat, 'player':player, 'chips':chips})
+        else:
+            actions.append(line)
     return actions
 
 
@@ -203,7 +210,7 @@ def GetHandInfosFromFile(file):
 
 
 def GetHandInfosFromFolder(folder):
-    for file in tools.iterfiles(path):
+    for file in iterfiles(path):
         for hinfo in GetHandInfosFromFile(file): 
             yield hinfo
 

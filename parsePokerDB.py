@@ -45,7 +45,18 @@
 """
 
 import cPickle
+import re
 import pprint
+
+
+def traceback(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            pprint.pprint(*args, **kwargs)
+            raise
+    return wrapper
 
 
 def FilterPlayerRaises(db, player):
@@ -93,6 +104,39 @@ def FilterOnePreflopCall(db, player, bb=3):
             yield hand
 
 
+def GetPlayersSeeingStreet(hand, street):
+    """
+        returns a list of players seeing street
+        ['playerA', 'playerB']
+    """
+    players = GetPlayers(hand)
+    for action in hand['actions']:
+        if action:
+            if action[0] in players and action[1] == 'folds':
+                players.remove(action[0])
+            elif action[0] == 'Uncalled bet' and action[-1] in players:
+                players.remove(action[-1])
+            if action[0] == street.upper():
+                break
+    return players
+
+
+def GetPlayersSeeingFlop(hand):
+    return GetPlayersSeeingStreet(hand, 'FLOP')
+
+
+def GetPlayersSeeingTurn(hand):
+    return GetPlayersSeeingStreet(hand, 'TURN')
+
+
+def GetPlayersSeeingRiver(hand):
+    return GetPlayersSeeingStreet(hand, 'RIVER')
+
+
+def GetPlayersSeeingShowDown(hand):
+    return GetPlayersSeeingStreet(hand, 'SHOW DOWN')
+
+
 def FilterEarnings(db, playerName):
     totalAmount = 0.0
     for hand in db:
@@ -117,14 +161,6 @@ def GetPlayers(hand):
             names.append(each['player'])
     return names
 
-def traceback(func):
-    def wrapper(*args, **kwargs):
-        try:
-            return func(hand)
-        except Exception:
-            pprint.pprint(hand)
-            raise
-    return wrapper
 
 @traceback
 def GetEarnings(hand):
@@ -200,10 +236,17 @@ if __name__ == "__main__":
             errors += 1
             continue
 
+
         for player, amount in earnings.iteritems():
             if player not in players:
                 players[player] = 0.0
             players[player] += amount
+            
+        x = GetPlayersSeeingShowDown(hand)
+        if x:
+            pprint.pprint(hand['actions'])
+            pprint.pprint(x)
+            #print
 
         if 0:        
             pprint.pprint(hand)

@@ -47,8 +47,6 @@
 import cPickle
 import pprint
 
-dbfile = 'f:\pokerstars\hand_history.pickle'
-
 
 def FilterPlayerRaises(db, player):
     for hand in db:
@@ -59,6 +57,7 @@ def FilterPlayerRaises(db, player):
         except:
             pprint.pprint(hand)
             raise
+
 
 def FilterOnePreflopCall(db, player, bb=3):
     """
@@ -116,16 +115,24 @@ def GetPlayers(hand):
     for each in hand['preflop_actions']:
         if type(each) == type(dict()):
             names.append(each['player'])
-    return names        
-            
+    return names
 
+def traceback(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(hand)
+        except Exception:
+            pprint.pprint(hand)
+            raise
+    return wrapper
+
+@traceback
 def GetEarnings(hand):
     """
         returns a list of player names and winings, losses
         [[player1, -0.2], [player2, 0.2]]
     """
     players = dict([[p, 0.0] for p in GetPlayers(hand)])
-    
     
     #blinds
     for action in hand['preflop_actions']:
@@ -141,15 +148,28 @@ def GetEarnings(hand):
                 players[name] -= amount
 
     # not finished
+    raiseAmount = []
     for action  in hand['actions']:
         if len(action) > 1:
             if action[1] == 'raises':
-                players[action[0]] -= float(action[2])
+                if raiseAmount:
+                    while raiseAmount:
+                        p, a = raiseAmount.pop(-1)
+                        players[p] -= a
+                raiseAmount.append([action[0], float(action[2])])
+                players[action[0]] -= float(action[3])-float(action[2])
+            elif action[1] == 'bets':
+                raiseAmount.append([action[0], float(action[2])])
             elif action[1] == 'calls':
                 players[action[0]] -= float(action[2])
+                if raiseAmount:
+                    while raiseAmount:
+                        p, a = raiseAmount.pop(-1)
+                        players[p] -= a
             elif action[1] == 'collected':
                 players[action[0]] += float(action[2])
     return players
+
 
 def loadDB(dbFile):
     with open(dbFile, 'rb') as rfp:
@@ -159,18 +179,42 @@ def loadDB(dbFile):
             except EOFError:
                 break
 
+
 def printOneHand(db):
     pprint.pprint(db.next())
 
+
 if __name__ == "__main__":
+    dbfile = 'f:\pokerstars\hand_history.pickle'
     db = loadDB(dbfile)
     #print GetTotalWins(db, 'eysispeisi')
     player = 'eysispeisi'
     n = 0
+    errors = 0
+    players = {}
     for hand in FilterOnePreflopCall(db, player):
-        pprint.pprint(hand)
-        pprint.pprint(GetEarnings(hand))
-        break
+        try:
+            earnings = GetEarnings(hand)
+        except Exception:
+            n -= 1
+            errors += 1
+            continue
+
+        for player, amount in earnings.iteritems():
+            if player not in players:
+                players[player] = 0.0
+            players[player] += amount
+
+        if 0:        
+            pprint.pprint(hand)
+            pprint.pprint(earnings)
+            break
         #if n == 5: break
         n +=1
+
+    amount = players['eysispeisi']
     print n
+    print 'eysispeisi earnings:', amount
+    print 'per 100 hands:', amount/n*100
+    #pprint.pprint(players)
+    print 'errors:', errors

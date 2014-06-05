@@ -100,16 +100,15 @@ def GetPreActions(hand, handInfo):
     lines = hand.splitlines()
     i = len(handInfo['players']) + 2
     actions = []
+    r = 'Seat (?P<seat>[\d]{1}): (?P<player>.+) \([\$]{0,1}(?P<chips>[\d.]+) in chips\)'
     for line in lines[i:]:
         if line == '*** HOLE CARDS ***':
             break
-        elif line.startswith('Seat '):
-            seat, ln = line[5:].split(":", 1)
-            ln = ln.strip()
-            player, ln = ln.split("(", 1)
-            player = player.strip()
-            chips, ln = ln.split(" ", 1)
-            actions.append({'seat':seat, 'player':player, 'chips':chips})
+
+        m = re.match(r, line)
+        if m:
+            actions.append(m.groupdict())
+
         else:
             actions.append(line)
     return actions

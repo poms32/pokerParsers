@@ -44,6 +44,7 @@
  'timestr': '2014/02/25 23:48:37'}
 """
 
+import sys
 import cPickle
 import re
 import pprint
@@ -103,6 +104,16 @@ def FilterOnePreflopCall(db, player, bb=3):
         if yieldHand:
             yield hand
 
+
+def GetShownHands(hand):
+    """
+        hands shown by player are excluded
+    """
+    shownHands = []
+    for action in hand['actions']:
+        if len(action) > 1 and action[1] == 'shows':
+            shownHands.append(action[0:4])
+    return shownHands
 
 def GetPlayersSeeingStreet(hand, street):
     """
@@ -228,36 +239,12 @@ if __name__ == "__main__":
     n = 0
     errors = 0
     players = {}
-    for hand in FilterOnePreflopCall(db, player):
-        try:
-            earnings = GetEarnings(hand)
-        except Exception:
-            n -= 1
-            errors += 1
-            continue
-
-
-        for player, amount in earnings.iteritems():
-            if player not in players:
-                players[player] = 0.0
-            players[player] += amount
-            
-        x = GetPlayersSeeingShowDown(hand)
+    shownHands = []
+    for hand in db:
+        x = GetShownHands(hand)
         if x:
-            pprint.pprint(hand['actions'])
-            pprint.pprint(x)
-            #print
+            shownHands.extend(x)
 
-        if 0:        
-            pprint.pprint(hand)
-            pprint.pprint(earnings)
-            break
-        #if n == 5: break
-        n +=1
-
-    amount = players['eysispeisi']
-    print n
-    print 'eysispeisi earnings:', amount
-    print 'per 100 hands:', amount/n*100
-    #pprint.pprint(players)
-    print 'errors:', errors
+    for each in shownHands:
+        print each
+        sys.stdout.flush()

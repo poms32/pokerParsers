@@ -1,13 +1,10 @@
 import re
 import time
 import cPickle
-
 import os
+import tools
 
-def iterfiles(folder):
-    for r,d,f in os.walk(folder):
-        for fn in f:
-            yield os.path.join(r, fn)
+
 
 P = {
     'money': '[\$]{0,1}([\d.]+)',
@@ -27,18 +24,12 @@ def GetHandInfo(hand):
     line = hand.split('\n', 1)[0]
     p = (
         "PokerStars[ ]*(?P<is_zoom>Zoom|)[ ]*Hand #(?P<hand_id>[\d]+):[ ]+"
-        "(?P<game_type>Hold'em|Omaha) (?P<betting_structure>No Limit|Limit|Pot Limit) "
+        "(?P<game_type>Hold'em|Omaha|5 Card Draw) (?P<betting_structure>No Limit|Limit|Pot Limit) "
         "\(%(dollar)s(?P<small_blind>[\.\d]+)/%(dollar)s(?P<big_blind>[\.\d]+)[ ]*(?P<currency>USD|EUR|)\) - "
         "(?P<timestr>[\d/ :\w]+) (?P<time_zone>ET|UTC).*"
         )
     m = re.match(p%P, line)
-    try:
-        header = m.groupdict()
-    except AttributeError:
-        print "hand:", hand
-        print "%r"%line
-        print line
-        raise
+    header = m.groupdict()
     header['time'] = time.mktime(time.strptime(header['timestr'], '%Y/%m/%d %H:%M:%S'))
     return header
 
@@ -53,13 +44,7 @@ def GetTableInfo(hand):
         "Seat #(?P<button>[\d]+) is the button"
         )
     m = re.match(p%P, line)
-    try:
-        header = m.groupdict()
-    except AttributeError:
-        print "table:", hand
-        print "%r"%line
-        print line
-        raise
+    header = m.groupdict()
     return header
 
 
@@ -76,12 +61,7 @@ def GetPlayers(hand, handinfo):
     for n, line in enumerate(lines[2:]):
         if re.match("^Seat: [1-9]{1}: .*", line):
             m = re.match(p%P, line)
-            try:
-                players.append(m.groupdict())
-            except Exception:
-                print "hand:", hand
-                print "line:", line
-                raise
+            players.append(m.groupdict())
         else:
             break
     #dictorialize the players list
@@ -209,7 +189,7 @@ def GetHandInfosFromFile(file):
 
 
 def GetHandInfosFromFolder(folder):
-    for file in iterfiles(path):
+    for file in tools.iterfiles(folder):
         for hinfo in GetHandInfosFromFile(file): 
             yield hinfo
 
@@ -230,8 +210,8 @@ def IterHandInfoFromPickle(fileName):
             except EOFError:
                 break
 
-
-if __name__ == '__main__':
+@tools.errorhandling
+def main():
     import pprint
     path = r'F:\pokerstars\processed'
     f = r"""F:\pokerstars\processed\2014\01-26\HH20140125 McNaught #41 - $0.01-$0.02 - USD No Limit Hold'em.txt"""
@@ -262,3 +242,6 @@ if __name__ == '__main__':
                 except EOFError:
                     break
         print len(hands)
+
+if __name__ == '__main__':
+    main()

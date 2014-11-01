@@ -65,17 +65,32 @@ class EarningsTracker:
     """
 
     def __init__(self):
+        """
+            self.earnings = {
+                'gameid' : {'player1': 2.34, 'player2': -1.23, ...}
+        """
         self.earnings = {}
 
     def GetPlayers(self):
-        return self.earnings.keys()
+        players = set()
+        for i, p in self.earnings.iteritems():
+            players.append(p)
+        return players
 
     def GetPlayerEarnings(self, player):
-        if player in self.earnings:
-            return self.earnings[player]
-        else:
-            return 0.0
+        total = 0.0
+        for id, players in self.earnings.iteritems():
+            if player in players:
+                total += players[player]
+        return total
 
+    def GetHandsWithPlayer(self, player):
+        hands = []
+        for i, p in self.earnings.iteritems():
+            if player in p:
+                hands.append([i, p])
+        return hands
+        
     def Update(self, hand):
         playerNames = GetPlayers(hand)
         GetPlayerDict = lambda: dict([[p, 0] for p in playerNames])
@@ -109,10 +124,8 @@ class EarningsTracker:
                     roundAmounts = GetPlayerDict()
                     players[action[0]] += dgt(action[2])
 
+        self.earnings[hand['game']['id']] = {}
         for player, cash in players.iteritems():
             if cash:
-                if player not in self.earnings:
-                    self.earnings[player] = flt(cash)
-                else:
-                    self.earnings[player] += flt(cash)
+                self.earnings[hand['game']['id']][player] = flt(cash)
 

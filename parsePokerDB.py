@@ -40,7 +40,8 @@ def CalculateEarnings(db, playerName):
     tm = time.gmtime()
     lastMidnight = time.time() - tm.tm_sec - tm.tm_min*60 - tm.tm_hour*3600
     d = time.mktime((2014,10,22,0,0,0,0,0,0))
-    db = handFilters.FilterTime(db, d, time.time())
+    #db = handFilters.FilterTime(db, d, time.time())
+    db = handFilters.FilterStealingBlinds(db, playerName)
 
     total = 0
     earnings = handInfo.EarningsTracker()
@@ -49,6 +50,13 @@ def CalculateEarnings(db, playerName):
         earnings.Update(hand)
     print playerName
     print earnings.GetPlayerEarnings(playerName)
+    l = []
+    for i, p in earnings.GetHandsWithPlayer(playerName):
+        l.append(p[playerName])
+    l.sort()
+    print '+0.03', l.count(0.03), 'total:', l.count(0.03)*0.03
+    print '-0.06', l.count(-0.06), 'total:', l.count(-0.06)*(-0.06)
+    #print l
     print total
 
 

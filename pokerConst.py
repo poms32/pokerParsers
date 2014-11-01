@@ -6,6 +6,9 @@ C_RAISES = 'raises'
 C_BETS = 'bets'
 C_COLLECTED = 'collected'
 C_CALLS = 'calls'
+C_POSTS_BIG_BLIND = 'posts big blind'
+C_POSTS_SMALL_BLIND = 'posts small blind'
+C_POSTS_SMALL_AND_BIG_BLIND = 'posts small & big blinds'
 
 C_HOLDEM = "Hold'em"
 C_ZOOM = 'Zoom'
@@ -16,6 +19,7 @@ C_NO_LIMIT = 'No Limit'
 C_POT_LIMIT = 'Pot Limit'
 C_FIZED_LIMIT = 'Fixed Limit'
 
+C_HOLE_CARDS = 'HOLE CARDS'
 C_FLOP = 'FLOP'
 C_TURN = 'TURN'
 C_RIVER = 'RIVER'

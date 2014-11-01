@@ -1,8 +1,6 @@
+import time
 
-
-import pprint
 from pokerConst import *
-import parsePokerDB
 import handInfo
 
 ##########################################################################################
@@ -12,25 +10,25 @@ import handInfo
 
 def FilterGameType(db, gameType):
     for hand in db:
-        if hand['game_type'] == gameType:
+        if hand['game']['type'] == gameType:
             yield hand
 
 
 def FilterByBigBlindSize(db, size):
     for hand in db:
-        if hand['big_blind'] == size:
+        if hand['game']['bigBlind'] == size:
             yield hand
 
 
 def FilterZOOMOnly(db):
     for hand in db:
-        if hand['is_zoom'] == C_ZOOM:
+        if hand['game']['isZoom']:
             yield hand
 
 
 def FilterByTableSize(db, seats):
     for hand in db:
-        tableSize = int(hand['Table']['table_size'])
+        tableSize = int(hand['table']['size'])
         if tableSize == int(seats):
             yield hand
 
@@ -42,6 +40,17 @@ def FilterPlayerSeat(db, player, seat):
             yield hand
 
 
+def FilterTime(db, fromDate=None, toDate=None):
+    if fromDate is None:
+        fromDate = 0
+    if toDate is None:
+        toDate = time.time()
+    for hand in db:
+        handTime = hand['game']['time']
+        if fromDate <= handTime < toDate:
+            yield hand
+
+
 ##########################################################################################
 ### Action sequence filters
 ###
@@ -49,13 +58,9 @@ def FilterPlayerSeat(db, player, seat):
 
 def FilterPlayerRaises(db, player):
     for hand in db:
-        try:
-            for action in hand['actions']:
-                if action and player == action[0] and action[1] == 'raises':
-                    yield hand
-        except:
-            pprint.pprint(hand)
-            raise
+        for action in hand['actions']:
+            if action and player == action[0] and action[1] == C_RAISES:
+                yield hand
 
 
 def FilterOnePreflopCall(db, player, bb=3):
@@ -67,24 +72,24 @@ def FilterOnePreflopCall(db, player, bb=3):
         gotRaise = False
         gotCall = False
         yieldHand = False
-        bigBlind = float(hand['big_blind'])
+        bigBlind = float(hand['game']['bigBlind'])
         for action in hand['actions']:
             if len(action) < 2:
                 continue
 
-            if gotCall and action[1] == 'calls':
+            if gotCall and action[1] == C_CALLS:
                 # second call
                 yieldHand = False
                 break
 
             if gotRaise:
-                if action[1] == 'raises':
+                if action[1] == C_RAISES:
                     break
-                if action[1] == 'calls':
+                if action[1] == C_CALLS:
                     gotCall = True
                     yieldHand = True
 
-            if player == action[0] and action[1] == 'raises':
+            if player == action[0] and action[1] == C_RAISES:
                 if bb*bigBlind == float(action[3]):
                     gotRaise = True
 

@@ -14,23 +14,38 @@ P = {
 
 
 
-def GetHandInfo(hand):
+def GetGameInfo(hand):
     """
     PokerStars Hand #89153008615: Tournament #642836638, $0.23+$0.02 USD Hold'em No Limit - Level I (10/20) - 2012/11/12 18:33:59 ET
     "PokerStars Hand #89422277261:  Hold'em No Limit (5/10) - 2012/11/18 6:28:43 ET"
     "PokerStars Hand #88903694647:  Hold'em Limit ($0.02/$0.04 USD) - 2012/11/07 20:16:54 ET"
     "PokerStars Hand #112225863883:  Hold'em Limit ($0.02/$0.04 USD) - 2014/02/22 15:29:57 UTC [2014/02/22 10:29:57 ET]"
+    "PokerStars Zoom Hand #124146287119:  Hold'em No Limit ($0.01/$0.02) - 2014/10/30 0:17:41 UTC [2014/10/29 20:17:41 ET]"
     """
     line = hand.split('\n', 1)[0]
     p = (
-        "PokerStars[ ]*(?P<is_zoom>Zoom|)[ ]*Hand #(?P<hand_id>[\d]+):[ ]+"
-        "(?P<game_type>Hold'em|Omaha|5 Card Draw) (?P<betting_structure>No Limit|Limit|Pot Limit) "
-        "\(%(dollar)s(?P<small_blind>[\.\d]+)/%(dollar)s(?P<big_blind>[\.\d]+)[ ]*(?P<currency>USD|EUR|)\) - "
-        "(?P<timestr>[\d/ :\w]+) (?P<time_zone>ET|UTC).*"
+        "PokerStars[ ]*(?P<isZoom>Zoom|)[ ]*Hand #(?P<id>[\d]+):[ ]+"
+        "(?P<type>Hold'em|Omaha|5 Card Draw) (?P<bettingStructure>No Limit|Limit|Pot Limit|Fixed Limit) "
+        "\(%(dollar)s(?P<smallBlind>[\.\d]+)/(?P<currency2>%(dollar)s)(?P<bigBlind>[\.\d]+)[ ]*(?P<currency>USD|EUR|)\) - "
+        "(?P<timestr1>[\d/ :\w]+) (?P<time_zone1>ET|UTC) \[(?P<timestr2>[\d/ :\w]+) (?P<time_zone2>ET|UTC)\]"
         )
     m = re.match(p%P, line)
     header = m.groupdict()
-    header['time'] = time.mktime(time.strptime(header['timestr'], '%Y/%m/%d %H:%M:%S'))
+    
+    for x in xrange(1, 3):
+        if ('time_zone%d'%x) in header:
+            if header[('time_zone%d'%x)] == 'ET':
+                header['time'] = time.mktime(time.strptime(header['timestr%d'%x], '%Y/%m/%d %H:%M:%S'))
+            elif header[('time_zone%d'%x)] == 'UTC':
+                header['timeUTC'] = time.mktime(time.strptime(header['timestr%d'%x], '%Y/%m/%d %H:%M:%S'))
+        del header['time_zone%d'%x]
+        del header['timestr%d'%x]
+
+    if not header['currency']:
+        if header['currency2'] == '$':
+            header['currency'] = 'USD'
+    del header['currency2']
+    
     return header
 
 
@@ -38,10 +53,10 @@ def GetHandInfo(hand):
 def GetTableInfo(hand):
     line = hand.splitlines()[1]
     p = (
-        "Table '(?P<table_name>[\w -]+)' "
-        "(?P<table_size>[\d]+)-max "
-        "(?P<play_money>\(Play Money\)|)[ ]*"
-        "Seat #(?P<button>[\d]+) is the button"
+        "Table '(?P<name>[\w -]+)' "
+        "(?P<size>[\d]+)-max "
+        "(?P<playMoney>\(Play Money\)|)[ ]*"
+        "Seat #(?P<buttonSeat>[\d]+) is the button"
         )
     m = re.match(p%P, line)
     header = m.groupdict()
@@ -55,43 +70,21 @@ def GetPlayers(hand, handinfo):
     p = (
         "Seat (?P<seat>[\d]+): "
         "(?P<name>.+) "
-        "\(%(dollar)s(?P<stack>[\d\.]+) in chips\)"
+        "\(%(dollar)s(?P<stack>[\d\.]+) in chips\)[ ]*"
         )
     lines = hand.splitlines()
     for n, line in enumerate(lines[2:]):
-        if re.match("^Seat: [1-9]{1}: .*", line):
+        if re.match("^Seat [\d]+: .*", line):
             m = re.match(p%P, line)
             players.append(m.groupdict())
         else:
             break
     #dictorialize the players list
-    ret = {}
+    ret = []
     for p in players:
-        ret[p.pop('name')] = p
+        tmp = (p['name'], p['seat'], p['stack'])
+        ret.append(tmp)
     return ret
-
-
-def GetPreActions(hand, handInfo):
-    """
-    posting blinds
-    players sitting out
-    
-    """
-    lines = hand.splitlines()
-    i = len(handInfo['players']) + 2
-    actions = []
-    r = 'Seat (?P<seat>[\d]{1}): (?P<player>.+) \([\$]{0,1}(?P<chips>[\d.]+) in chips\)'
-    for line in lines[i:]:
-        if line == '*** HOLE CARDS ***':
-            break
-
-        m = re.match(r, line)
-        if m:
-            actions.append(m.groupdict())
-
-        else:
-            actions.append(line)
-    return actions
 
 
 def GetPlayerActions(hand, handInfo):
@@ -99,8 +92,14 @@ def GetPlayerActions(hand, handInfo):
     Actions taken by players after cards are dealt
     """
     lines = hand.splitlines()
-    i = len(handInfo['players']) + 2 + len(handInfo['preflop_actions']) + 1
+    i = len(handInfo['players']) + 2
     patterns = [
+        '(.+): (sits out)',
+        '(.+) (will be allowed to play after the button)',
+        '(.+): (posts small blind) %(money)s',
+        '(.+): (posts big blind) %(money)s',
+        '(.+): (posts small & big blinds) %(money)s',
+        '(.+): (posts the ante) %(money)s',
         '(.+): (calls) %(money)s',
         '(.+): (folds)',
         '(.+): (bets) %(money)s',
@@ -110,7 +109,12 @@ def GetPlayerActions(hand, handInfo):
         '(.+): (mucks) hand',
         '(.+): (checks)',
         "(.+): (doesn't show hand)",
+        "(.+): (discards) ([\d]+) card[ |s]{0,1}",
+        "(.+): (discards) ([\d]+) card[ |s]{0,1} %(cards)s",
+        '(.+): (stands pat)',
         #'(.+): (.+)',
+        '\*\*\* (HOLE CARDS) \*\*\*',
+        '\*\*\* (DEALING HANDS) \*\*\*',
         '\*\*\* (FLOP) \*\*\* %(cards)s',
         '\*\*\* (FIRST FLOP) \*\*\* %(cards)s',
         '\*\*\* (SECOND FLOP) \*\*\* %(cards)s',
@@ -143,8 +147,8 @@ def GetPlayerActions(hand, handInfo):
                     actions.append(m.groups())
                     break
             else:
-                print hand
-                raise Exception("parse failure:", line)
+                print "parse failure:", line
+                #raise Exception("parse failure:", line)
 
     return actions
 
@@ -157,16 +161,18 @@ def GetSummary(hand, handInfo):
     i = hands.index('*** SUMMARY ***') + 1
     
     patterns = [
-        "Total pot %(dollar)s(?P<total_pot>[\d.]+)",
+        "Total pot %(dollar)s(?P<potSize>[\d.]+)",
         "Rake %(dollar)s(?P<rake>[\d.]+)",
-        "Side pot %(dollar)s(?P<side_pot>[\d.]+)\.",
+        "Side pot %(dollar)s(?P<sidePot>[\d.]+)\.",
         ]
     for p in patterns:
         m = re.search(p%P, hands[i])
         if m:
             summary.update(m.groupdict())
 
-    summary['board'] = hands[i+1].split(' ', 1)[-1].strip('[]')
+    summary['board'] = ''
+    if hands[i+1].startswith('Board '):
+        summary['board'] = hands[i+1].split(' ', 1)[-1].strip('[]')
     
     return summary
 
@@ -178,13 +184,15 @@ def GetHandInfosFromFile(file):
         hands = [x.strip() for x in fp.read().split('\n\n\n') if x.strip()]
         hands = [x for x in hands if "Tournament" not in x]
     for hand in hands:
-        handInfo = GetHandInfo(hand)
-        handInfo['Table'] = GetTableInfo(hand)
+        handInfo = {}
+        handInfo['game'] = GetGameInfo(hand)
+        handInfo['table'] = GetTableInfo(hand)
         handInfo['players'] = GetPlayers(hand, handInfo)
-        handInfo['preflop_actions'] = GetPreActions(hand, handInfo)
         handInfo['actions'] = GetPlayerActions(hand, handInfo)
         handInfo['summary'] = GetSummary(hand, handInfo)
+        #handInfo['text'] = hand
         ret.append(handInfo)
+        
     return ret
 
 
@@ -214,12 +222,18 @@ def IterHandInfoFromPickle(fileName):
 def main():
     import pprint
     path = r'F:\pokerstars\processed'
+    
+    #path = r'F:\pokerstars\test'
     f = r"""F:\pokerstars\processed\2014\01-26\HH20140125 McNaught #41 - $0.01-$0.02 - USD No Limit Hold'em.txt"""
+    f = r"""F:\pokerstars\processed\2014\10-30\HH20141029 McNaught #6 - $0.01-$0.02 - USD No Limit Hold'em.txt"""
     db = 'f:\pokerstars\hand_history.pickle'
 
 
     if 0:
-        pprint.pprint(GetHandInfosFromFile(f)[10])
+        hi = GetHandInfosFromFile(f)[102]
+        pprint.pprint(hi)
+        print hi['text']
+
         exit()
 
     if 1:

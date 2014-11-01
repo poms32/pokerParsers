@@ -1,3 +1,5 @@
+from collections import defaultdict
+import pprint
 from pokerConst import *
 
 
@@ -51,16 +53,15 @@ def GetPlayers(hand):
         returns a list of players sitting at table
     """
     names = []
-    for each in hand['preflop_actions']:
-        if type(each) == type(dict()):
-            names.append(each['player'])
+    for each in hand['players']:
+        names.append(each[0])
     return names
 
 
 
 class EarningsTracker:
     """
-        !!! Not trusted, needs unit testing. date: 30.10.2014 !!! 
+        calculate earnings of each player in a hand
     """
 
     def __init__(self):
@@ -76,53 +77,42 @@ class EarningsTracker:
             return 0.0
 
     def Update(self, hand):
-        """
-            returns a list of player names and winings, losses
-            [[player1, -0.2], [player2, 0.2]]
-        """
-        players = dict([[p, 0.0] for p in GetPlayers(hand)])
+        playerNames = GetPlayers(hand)
+        GetPlayerDict = lambda: dict([[p, 0] for p in playerNames])
+        dgt = lambda s: int(round(float(s)*100))
+        flt = lambda s: float(s)/100
 
-        #blinds
-        # need to remove all formatting from this function
-        for action in hand['preflop_actions']:
-            if type(action) == type(str()) and 'posts' in action:
-                name = action.rsplit(":", 1)[0]
-                if 'posts big blind' in action:
-                    amount = action.split('posts big blind')[-1]
-                    amount = amount.split()[0] #inclase "$x.xx and is all-in"
-                    amount = float(amount.strip(' $'))
-                    players[name] -= amount
-                elif 'posts small blind' in action:
-                    amount = action.split('posts small blind')[-1]
-                    amount = amount.split()[0] #inclase "$x.xx and is all-in"
-                    amount = float(amount.strip(' $'))
-                    players[name] -= amount
-
-        raiseAmount = []
+        players = GetPlayerDict()
+        roundAmounts = GetPlayerDict()
         for action  in hand['actions']:
             if len(action) > 1:
-                if action[1] == C_RAISES:
-                    if raiseAmount:
-                        while raiseAmount:
-                            p, a = raiseAmount.pop(-1)
-                            players[p] -= a
-                    raiseAmount.append([action[0], float(action[2])])
-                    players[action[0]] -= float(action[3])-float(action[2])
-                elif action[1] == C_BETS:
-                    raiseAmount.append([action[0], float(action[2])])
-                elif action[1] == C_CALLS:
-                    players[action[0]] -= float(action[2])
-                    if raiseAmount:
-                        while raiseAmount:
-                            p, a = raiseAmount.pop(-1)
-                            players[p] -= a
+                if action[1] in (C_POSTS_SMALL_BLIND, C_POSTS_BIG_BLIND, C_POSTS_SMALL_AND_BIG_BLIND):
+                    roundAmounts[action[0]] = dgt(action[2])
+
+                elif action[1] == C_RAISES:
+                    roundAmounts[action[0]] = dgt(action[3])
+
+                elif action[1] in (C_BETS, C_CALLS):
+                    roundAmounts[action[0]] += dgt(action[2])
+
+                elif action[0] in (C_FLOP, C_TURN, C_RIVER, C_SHOW_DOWN):
+                    for p, a in roundAmounts.iteritems():
+                        players[p] -= a
+                    roundAmounts = GetPlayerDict()
+
+                elif action[0] == C_UNCALLED_BET:
+                    players[action[2]] += dgt(action[1])
+
                 elif action[1] == C_COLLECTED:
-                    players[action[0]] += float(action[2])
+                    for p, a in roundAmounts.iteritems():
+                        players[p] -= a
+                    roundAmounts = GetPlayerDict()
+                    players[action[0]] += dgt(action[2])
 
         for player, cash in players.iteritems():
             if cash:
                 if player not in self.earnings:
-                    self.earnings[player] = cash
+                    self.earnings[player] = flt(cash)
                 else:
-                    self.earnings[player] += cash
+                    self.earnings[player] += flt(cash)
 

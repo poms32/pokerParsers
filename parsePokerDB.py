@@ -33,17 +33,24 @@ def CalculateEarnings(db, playerName):
     """
     db = handFilters.FilterGameType(db, C_HOLDEM)
     db = handFilters.FilterByBigBlindSize(db, C_2CENT)
-    #db = handFilters.FilterZOOMOnly(db)
-    db = handFilters.FilterByTableSize(db, 6)
+    db = handFilters.FilterZOOMOnly(db)
+    db = handFilters.FilterByTableSize(db, 9)
     #db = handFilters.FilterPlayerSeat(db, playerName, 1)
+
+    tm = time.gmtime()
+    lastMidnight = time.time() - tm.tm_sec - tm.tm_min*60 - tm.tm_hour*3600
+    d = time.mktime((2014,10,22,0,0,0,0,0,0))
+    db = handFilters.FilterTime(db, d, time.time())
 
     total = 0
     earnings = handInfo.EarningsTracker()
     for hand in db:
         total += 1
         earnings.Update(hand)
+    print playerName
     print earnings.GetPlayerEarnings(playerName)
     print total
+
 
 def GetDBSize(db):
     total = 0

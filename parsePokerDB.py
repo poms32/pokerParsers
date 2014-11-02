@@ -10,7 +10,7 @@ import tools
 import handFilters
 from pokerConst import *
 import handInfo
-
+import playerStatistics
 
 def loadDB(dbFile):
     with open(dbFile, 'rb') as rfp:
@@ -48,6 +48,8 @@ def CalculateEarnings(db, playerName):
     for hand in db:
         total += 1
         earnings.Update(hand)
+        pprint.pprint(hand)
+        raw_input()
     print playerName
     print earnings.GetPlayerEarnings(playerName)
     l = []
@@ -59,6 +61,30 @@ def CalculateEarnings(db, playerName):
     #print l
     print total
 
+    
+def TestStats(db, player):
+    db = handFilters.FilterGameType(db, C_HOLDEM)
+    db = handFilters.FilterByBigBlindSize(db, C_2CENT)
+    db = handFilters.FilterZOOMOnly(db)
+    db = handFilters.FilterByTableSize(db, 9)
+
+    tm = time.gmtime()
+    lastMidnight = time.time() - tm.tm_sec - tm.tm_min*60 - tm.tm_hour*3600
+    d = time.mktime((2014,11,2,0,0,0,0,0,0))
+    db = handFilters.FilterTime(db, d, time.time())
+    counter = playerStatistics.PlayerActionCounter()
+    h = 0
+    for hand in db:
+        h += 1
+        c = playerStatistics.ActionsToCounter(player, hand['actions'])
+        counter.MergeWithCounter(c)
+    ps = playerStatistics.PlayerStats(counter)
+    
+    print 'hands', h
+    print 'VPIP', ps.VPIP()
+    print 'PFR', ps.PFR()
+    pprint.pprint(counter)
+    
 
 def GetDBSize(db):
     total = 0
@@ -73,7 +99,8 @@ def main():
     db = loadDB(dbfile)
     #print GetTotalWins(db, 'eysispeisi')
     player = 'eysispeisi'
-    CalculateEarnings(db, player)
+    #CalculateEarnings(db, player)
+    TestStats(db, player)
     
 
 if __name__ == "__main__":

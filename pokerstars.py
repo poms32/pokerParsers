@@ -3,8 +3,9 @@ import time
 import cPickle
 import os
 import tools
+from collections import defaultdict
 
-
+import handInfo
 
 P = {
     'money': '[\$]{0,1}([\d.]+)',
@@ -12,8 +13,7 @@ P = {
     'dollar': '[\$]{0,1}',
     }
 
-
-
+    
 def GetGameInfo(hand):
     """
     PokerStars Hand #89153008615: Tournament #642836638, $0.23+$0.02 USD Hold'em No Limit - Level I (10/20) - 2012/11/12 18:33:59 ET
@@ -65,7 +65,7 @@ def GetTableInfo(hand):
 
 
 
-def GetPlayers(hand, handinfo):
+def GetPlayers(hand):
     players = []
     p = (
         "Seat (?P<seat>[\d]+): "
@@ -87,12 +87,12 @@ def GetPlayers(hand, handinfo):
     return ret
 
 
-def GetPlayerActions(hand, handInfo):
+def GetPlayerActions(hand, hf):
     """
     Actions taken by players after cards are dealt
     """
     lines = hand.splitlines()
-    i = len(handInfo['players']) + 2
+    i = len(hf['players']) + 2
     patterns = [
         '(.+): (sits out)',
         '(.+) (will be allowed to play after the button)',
@@ -152,7 +152,7 @@ def GetPlayerActions(hand, handInfo):
 
     return actions
 
-def GetSummary(hand, handInfo):
+def GetSummary(hand):
     """
     """
     hands = hand.splitlines()
@@ -184,14 +184,15 @@ def GetHandInfosFromFile(file):
         hands = [x.strip() for x in fp.read().split('\n\n\n') if x.strip()]
         hands = [x for x in hands if "Tournament" not in x]
     for hand in hands:
-        handInfo = {}
-        handInfo['game'] = GetGameInfo(hand)
-        handInfo['table'] = GetTableInfo(hand)
-        handInfo['players'] = GetPlayers(hand, handInfo)
-        handInfo['actions'] = GetPlayerActions(hand, handInfo)
-        handInfo['summary'] = GetSummary(hand, handInfo)
-        #handInfo['text'] = hand
-        ret.append(handInfo)
+        hf = {}
+        hf['game'] = GetGameInfo(hand)
+        hf['table'] = GetTableInfo(hand)
+        hf['players'] = GetPlayers(hand)
+        hf['actions'] = GetPlayerActions(hand, hf)
+        hf['summary'] = GetSummary(hand)
+        #hf['text'] = hand
+        hf['summary']['transactions'] = handInfo.CalculateTransactions(hf['actions'])
+        ret.append(hf)
         
     return ret
 
@@ -219,6 +220,7 @@ def IterHandInfoFromPickle(fileName):
                 break
 
 @tools.errorhandling
+@tools.timeit
 def main():
     import pprint
     path = r'F:\pokerstars\processed'
@@ -230,9 +232,9 @@ def main():
 
 
     if 0:
-        hi = GetHandInfosFromFile(f)[102]
-        pprint.pprint(hi)
-        print hi['text']
+        for each in GetHandInfosFromFile(f):
+            pprint.pprint(each)
+            raw_input()
 
         exit()
 

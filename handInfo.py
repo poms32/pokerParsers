@@ -58,7 +58,36 @@ def GetPlayers(hand):
     return names
 
 
+def CalculateTransactions(actions):
+    dgt = lambda s: int(round(float(s)*100))
+    flt = lambda s: float(s)/100
+    players = defaultdict(float)
+    roundAmounts = defaultdict(float)
+    for action in actions:
+        if len(action) > 1:
+            if action[1] in (C_POSTS_SMALL_BLIND, C_POSTS_BIG_BLIND, C_POSTS_SMALL_AND_BIG_BLIND):
+                roundAmounts[action[0]] = dgt(action[2])
+            elif action[1] == C_RAISES:
+                roundAmounts[action[0]] = dgt(action[3])
+            elif action[1] in (C_BETS, C_CALLS):
+                roundAmounts[action[0]] += dgt(action[2])
+            elif action[0] in (C_FLOP, C_TURN, C_RIVER, C_SHOW_DOWN):
+                for p, a in roundAmounts.iteritems():
+                    players[p] -= a
+                roundAmounts = defaultdict(float)
+            elif action[0] == C_UNCALLED_BET:
+                players[action[2]] += dgt(action[1])
+            elif action[1] == C_COLLECTED:
+                for p, a in roundAmounts.iteritems():
+                    players[p] -= a
+                roundAmounts = defaultdict(float)
+                players[action[0]] += dgt(action[2])
+    ret = {}
+    for player, cash in players.iteritems():
+        ret[player] = flt(cash)
+    return ret
 
+    
 class EarningsTracker:
     """
         calculate earnings of each player in a hand
@@ -90,6 +119,9 @@ class EarningsTracker:
             if player in p:
                 hands.append([i, p])
         return hands
+
+    def HandEarnings(self, handID):
+        return self.earnings[handID]
         
     def Update(self, hand):
         playerNames = GetPlayers(hand)
